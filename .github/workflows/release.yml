@@ -1,0 +1,357 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # Dry run: membangun kelima paket dan mencetak daftar SHA-256 tanpa membuat rilis. Tag yang sudah di-push tidak
+  # bisa dipindah dan rilis yang sudah terbit tidak bisa diubah (rilis immutable), jadi setiap perubahan berkas ini
+  # atau pin action yang dipakainya dicoba dulu dengan: gh workflow run release.yml --ref <cabang>
+  workflow_dispatch:
+
+# Token hanya-baca untuk seluruh workflow. Izin tulis hanya diberikan kepada job publish di bawah, karena action
+# pihak ketiga di job build (setup-msys2) tidak boleh memegang token yang bisa menulis ke repositori atau rilis.
+# Setiap action dipin ke commit SHA penuh (versinya di komentar); pinnya diperbarui lewat Dependabot.
+permissions:
+  contents: read
+
+# Dua run rilis untuk ref yang sama tidak boleh berjalan bersamaan; run kedua menunggu, tidak membatalkan.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Sesi asap baku (sama dengan ci.yml): satu baris per ketikan, baris kosong berarti Enter.
+  ASAP_KETIKAN: |
+    1
+    Gear
+    24
+    1,85
+    0
+    18500
+
+    y
+    Shaft
+    12
+    4.2
+    0
+    32000
+
+    t
+
+    2
+
+    0
+    y
+  ASAP_HARAP: |
+    Total berat    : 94,800 kg
+    Total biaya    : Rp2.434.200
+    - Shaft : Rp1.612.800 (66,3% dari total biaya)
+
+jobs:
+  # Gerbang: rilis berhenti sebelum apa pun dibangun bila nomor versi tidak konsisten. Tag harus sama dengan
+  # "v" + APP_VERSION, program harus mencetak versi itu, dan CHANGELOG.md harus punya bagian untuknya; bagian itu
+  # sekaligus menjadi catatan rilis.
+  gerbang:
+    name: Gerbang versi dan CHANGELOG
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      versi: ${{ steps.versi.outputs.versi }}
+      paket_ref: ${{ steps.versi.outputs.paket_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Periksa versi
+        id: versi
+        run: |
+          versi=$(sed -n 's/^const char\* const APP_VERSION = "\([0-9][0-9.]*\)";.*/\1/p' include/estima/app_info.h)
+          [ -n "$versi" ] || { echo "::error::APP_VERSION tidak terbaca dari include/estima/app_info.h"; exit 1; }
+          echo "APP_VERSION: $versi"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "$GITHUB_REF_NAME" = "v$versi" ] || { echo "::error::tag $GITHUB_REF_NAME tidak sama dengan v$versi (APP_VERSION)"; exit 1; }
+          else
+            echo "::notice::dry run dari cabang $GITHUB_REF_NAME; kecocokan tag dengan v$versi tidak diperiksa"
+          fi
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -Iinclude src/*.cpp -o estima
+          dicetak=$(./estima --version)
+          [ "$dicetak" = "ESTIMA $versi" ] || { echo "::error::--version mencetak '$dicetak', seharusnya 'ESTIMA $versi'"; exit 1; }
+          echo "versi=$versi" >> "$GITHUB_OUTPUT"
+          # Garis miring diganti tanda hubung karena pada dry run nama ref bisa berupa cabang seperti fitur/x, yang
+          # membuat tar dan zip mencoba menulis ke folder yang tidak ada. Untuk tag hasilnya tetap sama persis.
+          echo "paket_ref=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+
+      # Bagian "## [<versi>]" diambil sampai judul "## " berikutnya; baris tautan referensi Markdown di akhir
+      # CHANGELOG ("[1.0.0]: https://...") dibuang karena bukan bagian catatan versi itu.
+      - name: Ambil catatan rilis dari CHANGELOG
+        env:
+          VERSI: ${{ steps.versi.outputs.versi }}
+        run: |
+          [ -f CHANGELOG.md ] || { echo "::error::CHANGELOG.md tidak ada"; exit 1; }
+          awk -v head="## [$VERSI]" 'index($0, head) == 1 {f = 1; next} f && /^## / {exit} f && !/^\[[^]]+\]: /' CHANGELOG.md > catatan-rilis.md
+          grep -q '[^[:space:]]' catatan-rilis.md || { echo "::error::CHANGELOG.md tidak punya bagian ## [$VERSI] yang berisi"; exit 1; }
+          cat catatan-rilis.md
+
+      - name: Simpan catatan rilis
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: catatan-rilis
+          path: catatan-rilis.md
+          if-no-files-found: error
+
+  # Tahap 1: tiap platform membangun, menguji, dan mengemas paketnya sendiri lalu menyimpannya sebagai artifact.
+  # Halaman Release tidak disentuh di sini, karena lima job yang menulis ke satu rilis bersamaan saling bertabrakan.
+  build:
+    name: Paket ${{ matrix.label }}
+    needs: gerbang
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macos-universal
+            ext: zip
+          # Versi Ubuntu dipin sama untuk kedua arsitektur Linux, supaya toolchain-nya tidak berbeda dan peringatan
+          # -Werror tidak muncul hanya di salah satunya.
+          - os: ubuntu-24.04
+            label: linux-x86_64
+            ext: tar.gz
+            arch: x86_64
+          # Runner ARM64 membangun paket aarch64 secara native, sehingga uji asapnya benar-benar dijalankan.
+          - os: ubuntu-24.04-arm
+            label: linux-aarch64
+            ext: tar.gz
+            arch: aarch64
+          # Paket Termux dibangun dengan NDK bawaan runner x86_64 untuk bionic. Paket glibc statis mana pun tidak bisa
+          # jalan di Termux: termux-exec memuat program lewat linker Android (yang menolak ET_EXEC dan static-pie glibc
+          # tanpa PT_PHDR), dan seccomp aplikasi Android menjebak syscall yang dipanggil glibc saat mulai.
+          - os: ubuntu-24.04
+            label: android-aarch64
+            ext: tar.gz
+          - os: windows-latest
+            label: windows-x86_64
+            ext: zip
+    env:
+      VERSI: ${{ needs.gerbang.outputs.versi }}
+      PAKET: estima-${{ needs.gerbang.outputs.paket_ref }}-${{ matrix.label }}.${{ matrix.ext }}
+      EXE: ${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # zip dan unzip dipasang eksplisit: MSYS2 yang dipasang action ini masih kosong (keduanya bukan bagian paket
+      # dasarnya) dan alat milik Git for Windows tidak terlihat dari shell msys2.
+      - name: Pasang GCC, zip, dan unzip (Windows, MSYS2 UCRT64)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc zip unzip
+          cache: false  # cache toolchain ditulis run CI lain; paket rilis tidak boleh bergantung pada isinya
+
+      # SHA256SUMS dihitung sesudah kompilasi, jadi tidak akan mendeteksi action yang mengubah sumber sebelum itu.
+      - name: Pastikan sumber tidak berubah sejak checkout
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then git status --porcelain; echo "::error::pohon kerja berubah sesudah checkout"; exit 1; fi
+
+      # -mmacosx-version-min=11.0 menetapkan macOS 11 (Big Sur) sebagai versi terlama yang didukung; itu versi pertama
+      # untuk Apple Silicon dan juga tersedia untuk Mac Intel. Tanpa opsi itu clang memakai versi SDK milik runner
+      # sebagai target, sehingga paket hanya mau jalan di macOS yang sama barunya dengan runner. Target itu diperiksa
+      # di kedua irisan (arm64 dan x86_64), karena rilis tidak bisa dibetulkan setelah terbit.
+      - name: "Kompilasi macOS (universal: Apple Silicon dan Intel)"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p paket
+          clang++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -Iinclude src/*.cpp -o paket/estima
+          archs=$(lipo -archs paket/estima)
+          echo "arsitektur: $archs"
+          case " $archs " in *" arm64 "*) ;; *) echo "::error::biner tanpa arm64"; exit 1 ;; esac
+          case " $archs " in *" x86_64 "*) ;; *) echo "::error::biner tanpa x86_64"; exit 1 ;; esac
+          minos=$(otool -arch all -l paket/estima | awk '$1 == "minos" {print $2}' | sort -u | tr '\n' ' ')
+          echo "target macOS minimum: $minos"
+          [ "$minos" = "11.0 " ] || { echo "::error::target macOS minimum bukan 11.0 di kedua irisan: $minos"; exit 1; }
+          # Irisan untuk arsitektur runner dijalankan langsung di langkah uji asap di bawah. Di runner Apple Silicon,
+          # irisan x86_64 ikut dijalankan lewat Rosetta bila tersedia.
+          if [ "$(uname -m)" = "arm64" ] && arch -x86_64 /usr/bin/true 2>/dev/null; then
+            [ "$(arch -x86_64 ./paket/estima --version)" = "ESTIMA $VERSI" ] || { echo "::error::irisan x86_64 tidak jalan lewat Rosetta"; exit 1; }
+            echo "Irisan x86_64 jalan lewat Rosetta"
+          else
+            echo "::notice::irisan untuk arsitektur lain tidak dijalankan di runner ini ($(uname -m)); hanya keberadaannya yang diperiksa"
+          fi
+
+      # -static-pie menautkan semuanya termasuk glibc sekaligus tetap position-independent: paket jalan di distro
+      # dengan glibc lebih lama dari runner (Ubuntu 22.04, Debian 12, Alpine, WSL) dan tetap mendapat ASLR.
+      - name: Kompilasi Linux (static-pie)
+        if: runner.os == 'Linux' && matrix.label != 'android-aarch64'
+        shell: bash
+        run: |
+          # Label paket tidak boleh tertukar, karena coba.sh memilih paket dari nama arsitektur mesin.
+          [ "$(uname -m)" = "${{ matrix.arch }}" ] || { echo "::error::runner $(uname -m) tidak cocok dengan ${{ matrix.label }}"; exit 1; }
+          mkdir -p paket
+          g++ --version | head -n 1
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -static-pie -Iinclude src/*.cpp -o paket/estima
+          file paket/estima
+          file paket/estima | grep -q -e 'static-pie linked' -e 'statically linked' || { echo "::error::biner tidak statis"; exit 1; }
+          readelf -h paket/estima | grep -q 'Type:.*DYN (Position-Independent Executable' || { echo "::error::biner bukan PIE"; exit 1; }
+          [ "$(readelf -lW paket/estima | grep -c INTERP)" -eq 0 ] || { echo "::error::biner masih butuh interpreter dinamis"; exit 1; }
+
+      # PIE dinamis bionic dengan interpreter /system/bin/linker64 yang hanya meminta pustaka sistem Android, karena
+      # libc++ ditautkan statis. Runner tidak bisa menjalankan biner Android, jadi yang diperiksa bentuk ELF-nya;
+      # biner di-strip supaya paketnya kecil. Versi NDK mengikuti image runner dan dicetak ke log.
+      - name: Kompilasi Android aarch64 (NDK, bionic)
+        if: matrix.label == 'android-aarch64'
+        shell: bash
+        run: |
+          [ "$(uname -m)" = "x86_64" ] || { echo "::error::toolchain NDK prebuilt/linux-x86_64 butuh runner x86_64, bukan $(uname -m)"; exit 1; }
+          ndk="${ANDROID_NDK_LATEST_HOME:-}"; [ -d "$ndk" ] || { echo "::error::NDK tidak ada di runner"; exit 1; }
+          grep -h 'Pkg.Revision' "$ndk/source.properties" || true
+          cxx="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"
+          "$cxx" --version | head -n 1
+          mkdir -p paket
+          "$cxx" -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -static-libstdc++ -s -Iinclude src/*.cpp -o paket/estima
+          file paket/estima
+          readelf -h paket/estima | grep -q 'Type:.*DYN (Position-Independent Executable' || { echo "::error::biner Android bukan PIE"; exit 1; }
+          readelf -lW paket/estima | grep -q 'interpreter: /system/bin/linker64' || { echo "::error::interpreter bukan linker64"; exit 1; }
+          needed=$(readelf -dW paket/estima | awk '/NEEDED/ {print $5}' | tr -d '[]' | sort | tr '\n' ' ')
+          echo "NEEDED: $needed"
+          # Daftar putih persis, karena pustaka selain libc, libdl, dan libm tidak dijamin terlihat dari Termux.
+          [ "$needed" = "libc.so libdl.so libm.so " ] || { echo "::error::NEEDED bukan tepat libc.so libdl.so libm.so"; exit 1; }
+          [ "$(stat -c %s paket/estima)" -lt 1048576 ] || { echo "::error::biner Android lebih dari 1 MiB"; exit 1; }
+
+      # Ditautkan statis supaya estima.exe jalan di Windows mana pun tanpa DLL dari MSYS2.
+      - name: Kompilasi Windows (statis)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          mkdir -p paket
+          g++ --version | head -n 1
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -static -Iinclude src/*.cpp -o paket/estima.exe
+
+      # Biner yang akan dikemas dijalankan lebih dulu: versi yang dicetak harus sama dengan gerbang, dan sesi asap
+      # harus memberi hasil baku dengan kode keluar 0. Paket Android tidak bisa dijalankan di runner.
+      - name: Uji versi dan sesi asap
+        if: matrix.label != 'android-aarch64'
+        shell: bash
+        run: |
+          dicetak=$(./paket/estima"$EXE" --version | tr -d '\r')
+          [ "$dicetak" = "ESTIMA $VERSI" ] || { echo "::error::--version mencetak '$dicetak', seharusnya 'ESTIMA $VERSI'"; exit 1; }
+          status=0
+          out=$(printf '%s' "$ASAP_KETIKAN" | ./paket/estima"$EXE") || status=$?
+          [ "$status" -eq 0 ] || { printf '%s\n' "$out"; echo "::error::uji asap: kode keluar $status"; exit 1; }
+          while IFS= read -r s; do
+            grep -qF -- "$s" <<<"$out" || { printf '%s\n' "$out"; echo "::error::uji asap tidak memuat: $s"; exit 1; }
+          done <<<"$ASAP_HARAP"
+          echo "$dicetak, uji asap lulus"
+
+      # Isi paket diperiksa sesudah dikemas: tepat tiga berkas di akar arsip, karena coba.sh dan coba.ps1 hanya
+      # mengambil estima atau estima.exe dari akar paket.
+      - name: Kemas (macOS dan Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cp README.md LICENSE paket/
+          case "$PAKET" in
+            *.zip) (cd paket && zip -q -r "../$PAKET" .); isi=$(unzip -Z1 "$PAKET" | LC_ALL=C sort | tr '\n' ' ') ;;
+            *) tar -czf "$PAKET" -C paket .; isi=$(tar -tzf "$PAKET" | sed 's#^\./##' | grep -v '^$' | LC_ALL=C sort | tr '\n' ' ') ;;
+          esac
+          echo "$PAKET: $isi"
+          [ "$isi" = "LICENSE README.md estima " ] || { echo "::error::isi paket bukan tepat estima, README.md, LICENSE"; exit 1; }
+
+      - name: Kemas (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cp README.md LICENSE paket/
+          (cd paket && zip -q -r "../$PAKET" .)
+          isi=$(unzip -Z1 "$PAKET" | LC_ALL=C sort | tr '\n' ' ')
+          echo "$PAKET: $isi"
+          [ "$isi" = "LICENSE README.md estima.exe " ] || { echo "::error::isi paket bukan tepat estima.exe, README.md, LICENSE"; exit 1; }
+
+      - name: Simpan paket sebagai artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: paket-${{ matrix.label }}
+          path: ${{ env.PAKET }}
+          if-no-files-found: error
+
+  # Tahap 2 (tanpa izin tulis, juga pada dry run): kelima paket dikumpulkan, SHA256SUMS dibuat, dan isinya diperiksa
+  # tepat enam berkas dengan nama yang diharapkan. Pemeriksaan ini harus selesai sebelum publish, karena rilis
+  # immutable tidak bisa dibetulkan setelah terbit.
+  kumpulkan:
+    name: Kumpulkan paket dan SHA256SUMS
+    needs: [gerbang, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PAKET_REF: ${{ needs.gerbang.outputs.paket_ref }}
+    steps:
+      - name: Ambil semua paket
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: paket-*
+          path: rilis
+          merge-multiple: true
+
+      - name: Buat dan periksa SHA256SUMS
+        working-directory: rilis
+        run: |
+          for nama in macos-universal.zip linux-x86_64.tar.gz linux-aarch64.tar.gz android-aarch64.tar.gz windows-x86_64.zip; do
+            [ -f "estima-$PAKET_REF-$nama" ] || { echo "::error::paket estima-$PAKET_REF-$nama tidak ada"; exit 1; }
+          done
+          sha256sum -- estima-* > SHA256SUMS
+          cat SHA256SUMS
+          ls -l
+          [ "$(find . -maxdepth 1 -type f | wc -l)" -eq 6 ] || { echo "::error::jumlah berkas bukan 6 (5 paket + SHA256SUMS)"; exit 1; }
+
+      - name: Simpan berkas rilis
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rilis
+          path: rilis/
+          if-no-files-found: error
+
+  # Tahap 3: satu-satunya job yang memegang izin tulis, dan hanya untuk push tag. Rilis dibuat dengan gh CLI
+  # bawaan runner, jadi tidak ada kode pihak ketiga yang berjalan bersama token tulis.
+  publish:
+    name: Terbitkan rilis
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [gerbang, kumpulkan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write  # membuat rilis dan mengunggah asetnya
+    steps:
+      - name: Ambil berkas rilis
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rilis
+          path: rilis
+
+      - name: Ambil catatan rilis
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: catatan-rilis
+          path: catatan
+
+      # Diperiksa sekali lagi tepat sebelum terbit: enam berkas, dan setiap paket cocok dengan SHA256SUMS.
+      - name: Periksa ulang berkas rilis
+        working-directory: rilis
+        run: |
+          [ "$(find . -maxdepth 1 -type f | wc -l)" -eq 6 ] || { echo "::error::jumlah berkas bukan 6"; exit 1; }
+          sha256sum -c SHA256SUMS
+
+      # --verify-tag menolak membuat rilis bila tag belum ada di repositori, sehingga gh tidak diam-diam membuat tag
+      # baru dari cabang bawaan.
+      - name: Terbitkan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" rilis/* --verify-tag --title "ESTIMA $GITHUB_REF_NAME" --notes-file catatan/catatan-rilis.md

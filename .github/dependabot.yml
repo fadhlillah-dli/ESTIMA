@@ -1,0 +1,13 @@
+# Action di workflow dipin ke commit SHA penuh, jadi tidak lagi ikut diperbarui otomatis seperti tag versi dan
+# tidak tercakup peringatan kerentanan GitHub. Pin itu (beserta komentar versinya) disegarkan lewat pull request
+# mingguan dari Dependabot; semua pembaruan digabung dalam satu PR supaya mudah ditinjau dan CI menguji semuanya
+# sekaligus. Setelah PR seperti itu diterapkan, release.yml dicoba dulu lewat dry run (workflow_dispatch).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

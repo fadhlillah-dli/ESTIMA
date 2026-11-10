@@ -1,0 +1,391 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Supaya CI bisa dijalankan manual pada cabang mana pun: gh workflow run ci.yml --ref <cabang>
+  workflow_dispatch:
+
+# Token hanya-baca, karena CI tidak pernah menulis ke repositori. Ditulis eksplisit supaya tidak bergantung pada
+# setelan bawaan repositori. Setiap action dipin ke commit SHA penuh (versinya di komentar) dan pinnya diperbarui
+# lewat Dependabot, karena tag seperti v7 bisa dipindahkan oleh siapa pun yang menguasai repositori action itu.
+permissions:
+  contents: read
+
+# Push baru ke cabang yang sama membatalkan run lama yang belum selesai, karena hasilnya sudah tidak terpakai.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Sesi asap baku: satu baris per ketikan, baris kosong berarti Enter. Program mencetak ulang ketikan yang
+  # dibacanya dari pipa, jadi keluaran sesi ini terbaca seperti sesi interaktif.
+  ASAP_KETIKAN: |
+    1
+    Gear
+    24
+    1,85
+    0
+    18500
+
+    y
+    Shaft
+    12
+    4.2
+    0
+    32000
+
+    t
+
+    2
+
+    0
+    y
+  # Baris yang wajib muncul pada keluaran sesi asap (satu baris per butir, dicocokkan apa adanya).
+  ASAP_HARAP: |
+    Total berat    : 94,800 kg
+    Total biaya    : Rp2.434.200
+    - Shaft : Rp1.612.800 (66,3% dari total biaya)
+
+jobs:
+  build:
+    name: Build dan uji (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Versi Ubuntu dipin sama dengan release.yml, supaya CI menguji toolchain yang juga membangun paket rilis.
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+    env:
+      EXE: ${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+      # Di Windows, nama python3 bisa berupa pintasan Microsoft Store yang tidak bisa dijalankan.
+      PY: ${{ matrix.os == 'windows-latest' && 'python' || 'python3' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false  # tidak ada perintah git sesudah checkout, jadi token tidak perlu disimpan
+
+      - name: Pasang GCC (Windows, MSYS2 UCRT64)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      # Program modular, berkas tunggal (dikompilasi sendirian, tanpa -I, persis seperti saat dinilai), dan biner uji
+      # unit; satu peringatan pun menggagalkan build.
+      - name: Kompilasi tanpa peringatan (Linux dan macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          flags=(-std=c++17 -Wall -Wextra -pedantic -Werror)
+          core=(); for f in src/*.cpp; do [ "$f" = src/main.cpp ] || core+=("$f"); done
+          g++ --version | head -n 1
+          mkdir -p build/ci
+          g++ "${flags[@]}" -Iinclude src/*.cpp -o build/ci/estima
+          g++ "${flags[@]}" amalgamation/UTS_2531070011.cpp -o build/ci/estima-single
+          g++ "${flags[@]}" -Iinclude tests/unit/*.cpp "${core[@]}" -o build/ci/estima-unit-tests
+
+      # Ditautkan statis supaya biner bisa dijalankan Python milik runner di luar shell MSYS2, tanpa DLL libstdc++.
+      - name: Kompilasi tanpa peringatan (Windows, statis)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          flags=(-std=c++17 -Wall -Wextra -pedantic -Werror -static)
+          core=(); for f in src/*.cpp; do [ "$f" = src/main.cpp ] || core+=("$f"); done
+          g++ --version | head -n 1
+          mkdir -p build/ci
+          g++ "${flags[@]}" -Iinclude src/*.cpp -o build/ci/estima.exe
+          g++ "${flags[@]}" amalgamation/UTS_2531070011.cpp -o build/ci/estima-single.exe
+          g++ "${flags[@]}" -Iinclude tests/unit/*.cpp "${core[@]}" -o build/ci/estima-unit-tests.exe
+
+      - name: Uji unit
+        shell: bash
+        run: ./build/ci/estima-unit-tests"$EXE"
+
+      # Skenario ujung-ke-ujung dijalankan pada kedua biner, karena berkas tunggal adalah yang dikumpulkan; gate tata
+      # letak memastikan tidak ada baris yang melewati lebar terminal 40-120 kolom.
+      - name: Uji ujung-ke-ujung dan tata letak
+        shell: bash
+        run: |
+          "$PY" --version
+          "$PY" tests/e2e/run_e2e.py --exe "build/ci/estima$EXE"
+          "$PY" tests/e2e/run_e2e.py --exe "build/ci/estima-single$EXE"
+          "$PY" tests/e2e/check_layout.py --exe "build/ci/estima$EXE"
+
+      # Berkas tunggal di repositori harus sama persis dengan hasil bangkitan dari include/ dan src/.
+      - name: Berkas tunggal sesuai sumber
+        shell: bash
+        run: '"$PY" scripts/amalgamate.py --check'
+
+      # coba.sh diuji seperti dipakai orang (tanpa terminal, jadi ketikan lewat stdin) dan folder sementaranya harus
+      # hilang. Selama repositori belum punya rilis, skrip wajib berhenti dengan pesan "belum ada rilis"; hanya kasus
+      # itu yang diturunkan menjadi peringatan, kegagalan lain tetap merah. Begitu rilis pertama terbit, jalur unduh,
+      # verifikasi SHA-256, dan ekstraksi ikut teruji tanpa mengubah berkas ini.
+      - name: Uji scripts/coba.sh
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          status=0
+          out=$(printf '%s' "$ASAP_KETIKAN" | sh scripts/coba.sh 2>&1) || status=$?
+          printf '%s\n' "$out"
+          if [ "$status" -eq 1 ] && grep -qF 'coba.sh: belum ada rilis' <<<"$out"; then
+            echo "::warning::coba.sh: belum ada rilis; jalur unduh dan verifikasi baru teruji setelah rilis pertama"
+          elif [ "$status" -ne 0 ]; then
+            echo "::error::coba.sh keluar dengan status $status"; exit 1
+          else
+            while IFS= read -r s; do
+              grep -qF -- "$s" <<<"$out" || { echo "::error::keluaran coba.sh tidak memuat: $s"; exit 1; }
+            done <<<"$ASAP_HARAP"
+          fi
+          # coba.sh membuat foldernya di ${TMPDIR:-/tmp}; folder lain di sana bisa tidak terbaca, jadi galat find diabaikan.
+          left=$({ find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'estima-coba-*' 2>/dev/null || true; } | wc -l)
+          [ "$left" -eq 0 ] || { echo "::error::folder sementara coba.sh tidak dihapus ($left sisa)"; exit 1; }
+          echo "coba.sh OK, tanpa sisa folder"
+
+      # Satu badan uji dijalankan di Windows PowerShell 5.1 dan PowerShell 7 lewat mode terskrip ESTIMA_INPUT;
+      # aturannya sama dengan uji coba.sh di atas. Jalur interaktif (& $exe, Ctrl+C) hanya bisa diuji manual.
+      - name: Uji scripts/coba.ps1 (PowerShell 5.1 dan 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $uji = {
+            $ErrorActionPreference = 'Stop'
+            $versi = "PowerShell $($PSVersionTable.PSVersion)"
+            $env:ESTIMA_INPUT = Join-Path $env:RUNNER_TEMP 'coba-masuk.txt'
+            [IO.File]::WriteAllText($env:ESTIMA_INPUT, $env:ASAP_KETIKAN)
+            $global:LASTEXITCODE = 0
+            $log = (Get-Content -Raw scripts/coba.ps1 | Invoke-Expression) *>&1 | Out-String
+            $code = $global:LASTEXITCODE
+            Write-Host $log
+            if ($code -eq 1 -and $log.Contains('coba.ps1: belum ada rilis')) {
+              Write-Host "::warning::coba.ps1 ($versi): belum ada rilis; jalur unduh dan verifikasi baru teruji setelah rilis pertama"
+            } elseif ($code -ne 0) {
+              Write-Host "::error::coba.ps1 ($versi) selesai dengan kode $code"; exit 1
+            } else {
+              foreach ($s in $env:ASAP_HARAP -split "`n") {
+                if ($s -and -not $log.Contains($s)) { Write-Host "::error::keluaran coba.ps1 ($versi) tidak memuat: $s"; exit 1 }
+              }
+            }
+            $left = @(Get-ChildItem -Path ([IO.Path]::GetTempPath()) -Filter 'estima-coba-*' -Directory -ErrorAction SilentlyContinue)
+            if ($left.Count -ne 0) { Write-Host "::error::folder sementara coba.ps1 ($versi) tidak dihapus"; exit 1 }
+            Write-Host "coba.ps1 OK ($versi), tanpa sisa folder"
+            exit 0
+          }
+          # Lewat -File, bukan -EncodedCommand: bentuk itu membuat PowerShell anak mengirim keluaran host dalam CLIXML.
+          $file = Join-Path $env:RUNNER_TEMP 'uji-coba-ps1.ps1'
+          [IO.File]::WriteAllText($file, $uji.ToString())
+          foreach ($shell in 'powershell', 'pwsh') {
+            & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $file
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+
+      # Biner static-pie dibangun persis seperti paket rilis Linux lalu diperiksa: tautan statis penuh (termasuk glibc)
+      # supaya jalan di distro dengan glibc lebih lama dari runner, PIE supaya mendapat ASLR, dan tanpa interpreter.
+      - name: Biner static-pie seperti paket rilis Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -static-pie -Iinclude src/*.cpp -o build/ci/estima-static
+          file build/ci/estima-static
+          file build/ci/estima-static | grep -q -e 'static-pie linked' -e 'statically linked' || { echo "::error::biner tidak statis"; exit 1; }
+          readelf -h build/ci/estima-static | grep -q 'Type:.*DYN (Position-Independent Executable' || { echo "::error::biner bukan PIE"; exit 1; }
+          [ "$(readelf -lW build/ci/estima-static | grep -c INTERP)" -eq 0 ] || { echo "::error::biner masih butuh interpreter dinamis"; exit 1; }
+          status=0
+          out=$(printf '%s' "$ASAP_KETIKAN" | ./build/ci/estima-static) || status=$?
+          [ "$status" -eq 0 ] || { printf '%s\n' "$out"; echo "::error::uji asap: kode keluar $status"; exit 1; }
+          while IFS= read -r s; do
+            grep -qF -- "$s" <<<"$out" || { printf '%s\n' "$out"; echo "::error::uji asap tidak memuat: $s"; exit 1; }
+          done <<<"$ASAP_HARAP"
+          echo "Biner static-pie OK"
+
+      # Biner universal dibangun persis seperti paket rilis macOS lalu diperiksa: memuat arm64 (Apple Silicon) dan
+      # x86_64 (Intel), dengan target macOS minimum 11.0 (Big Sur). Tanpa -mmacosx-version-min, clang memakai versi
+      # SDK milik runner sebagai target, sehingga paket hanya mau jalan di macOS yang sama barunya dengan runner.
+      # Irisan untuk arsitektur runner dijalankan langsung; di runner Apple Silicon, irisan x86_64 ikut dijalankan
+      # lewat Rosetta bila tersedia.
+      - name: Biner universal seperti paket rilis macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -Iinclude src/*.cpp -o build/ci/estima-universal
+          archs=$(lipo -archs build/ci/estima-universal)
+          echo "arsitektur: $archs"
+          case " $archs " in *" arm64 "*) ;; *) echo "::error::biner tanpa arm64"; exit 1 ;; esac
+          case " $archs " in *" x86_64 "*) ;; *) echo "::error::biner tanpa x86_64"; exit 1 ;; esac
+          minos=$(otool -arch all -l build/ci/estima-universal | awk '$1 == "minos" {print $2}' | sort -u | tr '\n' ' ')
+          echo "target macOS minimum: $minos"
+          [ "$minos" = "11.0 " ] || { echo "::error::target macOS minimum bukan 11.0 di kedua irisan: $minos"; exit 1; }
+          status=0
+          out=$(printf '%s' "$ASAP_KETIKAN" | ./build/ci/estima-universal) || status=$?
+          [ "$status" -eq 0 ] || { printf '%s\n' "$out"; echo "::error::uji asap: kode keluar $status"; exit 1; }
+          while IFS= read -r s; do
+            grep -qF -- "$s" <<<"$out" || { printf '%s\n' "$out"; echo "::error::uji asap tidak memuat: $s"; exit 1; }
+          done <<<"$ASAP_HARAP"
+          if [ "$(uname -m)" = "arm64" ] && arch -x86_64 /usr/bin/true 2>/dev/null; then
+            versi=$(./build/ci/estima-universal --version)
+            [ "$(arch -x86_64 ./build/ci/estima-universal --version)" = "$versi" ] || { echo "::error::irisan x86_64 tidak jalan lewat Rosetta"; exit 1; }
+            echo "Irisan x86_64 jalan lewat Rosetta ($versi)"
+          else
+            echo "::notice::irisan untuk arsitektur lain tidak dijalankan di runner ini ($(uname -m)); hanya keberadaannya yang diperiksa"
+          fi
+          echo "Biner universal OK"
+
+      # Runner tidak bisa menjalankan biner Android, jadi di sini dibuktikan bahwa sumber bersih -Werror di clang NDK
+      # dan ELF-nya berbentuk yang bisa dimuat Termux: PIE dinamis bionic dengan interpreter linker64 yang hanya
+      # meminta pustaka sistem Android (libc++ ditautkan statis).
+      - name: Kompilasi Android aarch64 (NDK, pemeriksaan ELF)
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          [ "$(uname -m)" = "x86_64" ] || { echo "::error::toolchain NDK prebuilt/linux-x86_64 butuh runner x86_64, bukan $(uname -m)"; exit 1; }
+          ndk="${ANDROID_NDK_LATEST_HOME:-}"; [ -d "$ndk" ] || { echo "::error::NDK tidak ada di runner"; exit 1; }
+          grep -h 'Pkg.Revision' "$ndk/source.properties" || true
+          cxx="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"
+          "$cxx" --version | head -n 1
+          "$cxx" -std=c++17 -O2 -Wall -Wextra -pedantic -Werror -static-libstdc++ -s -Iinclude src/*.cpp -o build/ci/estima-android
+          file build/ci/estima-android
+          readelf -h build/ci/estima-android | grep -q 'Type:.*DYN (Position-Independent Executable' || { echo "::error::biner Android bukan PIE"; exit 1; }
+          readelf -lW build/ci/estima-android | grep -q 'interpreter: /system/bin/linker64' || { echo "::error::interpreter bukan linker64"; exit 1; }
+          needed=$(readelf -dW build/ci/estima-android | awk '/NEEDED/ {print $5}' | tr -d '[]' | sort | tr '\n' ' ')
+          [ "$needed" = "libc.so libdl.so libm.so " ] || { echo "::error::NEEDED bukan tepat libc.so libdl.so libm.so: $needed"; exit 1; }
+          [ "$(stat -c %s build/ci/estima-android)" -lt 1048576 ] || { echo "::error::biner Android lebih dari 1 MiB"; exit 1; }
+          echo "Biner Android OK (NEEDED: $needed)"
+
+  # Membuktikan klaim "C++98 sampai C++23": sumber yang sama dikompilasi pada tiap standar dengan tiga compiler.
+  standar:
+    name: C++${{ matrix.std }} (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, g++-14, clang++]
+        std: ['98', '11', '14', '17', '20', '23']
+    env:
+      CXX: ${{ matrix.compiler }}
+      STD: ${{ matrix.std }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Kompilasi modular, berkas tunggal, dan uji unit
+        run: |
+          flags=(-std="c++$STD" -Wall -Wextra -pedantic -Werror)
+          core=(); for f in src/*.cpp; do [ "$f" = src/main.cpp ] || core+=("$f"); done
+          "$CXX" --version | head -n 1
+          mkdir -p build/ci
+          "$CXX" "${flags[@]}" -Iinclude src/*.cpp -o build/ci/estima
+          "$CXX" "${flags[@]}" amalgamation/UTS_2531070011.cpp -o build/ci/estima-single
+          "$CXX" "${flags[@]}" -Iinclude tests/unit/*.cpp "${core[@]}" -o build/ci/estima-unit-tests
+
+      - name: Uji unit
+        run: ./build/ci/estima-unit-tests
+
+      - name: Uji asap (modular dan berkas tunggal)
+        run: |
+          for exe in build/ci/estima build/ci/estima-single; do
+            status=0
+            out=$(printf '%s' "$ASAP_KETIKAN" | "./$exe") || status=$?
+            [ "$status" -eq 0 ] || { printf '%s\n' "$out"; echo "::error::$exe: kode keluar $status"; exit 1; }
+            while IFS= read -r s; do
+              grep -qF -- "$s" <<<"$out" || { printf '%s\n' "$out"; echo "::error::$exe tidak memuat: $s"; exit 1; }
+            done <<<"$ASAP_HARAP"
+            echo "Uji asap $exe lulus"
+          done
+
+  # Dev-C++ 5.11, yang masih banyak dipakai di kelas, membawa GCC 4.9. Image gcc:4.9 berisi compiler dan pustaka
+  # standar dari generasi yang sama, jadi di dalamnya berkas tunggal dikompilasi seperti di Dev-C++: tanpa opsi apa
+  # pun (bawaan GCC 4.9 adalah C++98 dengan ekstensi GNU), lalu dengan -std=c++98 yang ketat, begitu juga sumber
+  # modular, kemudian sesi asap dijalankan. Image dipin ke digest-nya supaya isinya tidak bisa berganti diam-diam;
+  # sumber dipasang hanya-baca dan hasil kompilasi ditulis ke /tmp di dalam kontainer.
+  gcc49:
+    name: GCC 4.9 (generasi Dev-C++ 5.11)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      IMAGE: gcc:4.9@sha256:6356ef8b29cc3522527a85b6c58a28626744514bea87a10ff2bf67599a7474f5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Kompilasi di kontainer gcc:4.9 dan uji asap
+        run: |
+          status=0
+          out=$(printf '%s' "$ASAP_KETIKAN" | docker run --rm -i -v "$PWD:/src:ro" -w /src "$IMAGE" bash -ec '
+            g++ --version | head -n 1 >&2
+            g++ amalgamation/UTS_2531070011.cpp -o /tmp/estima
+            g++ -std=c++98 -Wall -Wextra -pedantic -Werror amalgamation/UTS_2531070011.cpp -o /tmp/estima-98
+            g++ -std=c++98 -Wall -Wextra -pedantic -Werror -Iinclude src/*.cpp -o /tmp/estima-modular
+            [ "$(/tmp/estima-98 --version)" = "$(/tmp/estima --version)" ]
+            [ "$(/tmp/estima-modular --version)" = "$(/tmp/estima --version)" ]
+            /tmp/estima
+          ') || status=$?
+          [ "$status" -eq 0 ] || { printf '%s\n' "$out"; echo "::error::kompilasi atau uji asap GCC 4.9 gagal (kode $status)"; exit 1; }
+          while IFS= read -r s; do
+            grep -qF -- "$s" <<<"$out" || { printf '%s\n' "$out"; echo "::error::uji asap GCC 4.9 tidak memuat: $s"; exit 1; }
+          done <<<"$ASAP_HARAP"
+          echo "GCC 4.9: berkas tunggal dan sumber modular terkompilasi tanpa peringatan, uji asap lulus"
+
+  # Visual C++ dengan /W4 /permissive- /WX lewat CMake. Generator tidak disebut supaya CMake memilih Visual Studio
+  # yang terpasang di runner; nama versi generator akan usang begitu image runner diperbarui.
+  msvc:
+    name: MSVC (CMake, ctest)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Konfigurasi
+        run: cmake -S . -B build/msvc -DESTIMA_WARNINGS_AS_ERRORS=ON
+
+      - name: Build Release
+        run: cmake --build build/msvc --config Release --parallel
+
+      - name: ctest
+        run: ctest --test-dir build/msvc -C Release --output-on-failure
+
+  lint:
+    name: Lint (shellcheck, ASCII, PowerShell)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: shellcheck
+        run: |
+          shellcheck --version | sed -n 's/^version: /shellcheck /p'
+          shellcheck scripts/*.sh
+
+      # Sumber C++ wajib ASCII murni dengan akhir baris LF dan tanpa tab, supaya terbaca sama di compiler dan editor
+      # mana pun (termasuk Dev-C++ lama). coba.ps1 ikut diperiksa karena Windows PowerShell 5.1 membaca berkas tanpa
+      # BOM dengan code page ANSI, dan coba.sh karena CRLF membuat sh gagal membacanya.
+      - name: Sumber ASCII, tanpa tab, tanpa CRLF
+        run: |
+          paths=(src include tests/unit amalgamation scripts/coba.sh scripts/coba.ps1)
+          fail=0
+          if LC_ALL=C grep -rnP '[^\x00-\x7F]' "${paths[@]}"; then echo "::error::ada byte non-ASCII (baris di atas)"; fail=1; fi
+          if LC_ALL=C grep -rnP '\t' "${paths[@]}"; then echo "::error::ada karakter tab (baris di atas)"; fail=1; fi
+          if LC_ALL=C grep -rlP '\r' "${paths[@]}"; then echo "::error::ada akhir baris CRLF (berkas di atas)"; fail=1; fi
+          [ "$fail" -eq 0 ] && echo "Semua berkas ASCII, tanpa tab, dan ber-LF"
+          exit "$fail"
+
+      # Parser bahasa PowerShell menangkap galat sintaks coba.ps1 tanpa menjalankannya.
+      - name: Sintaks coba.ps1
+        shell: pwsh
+        run: |
+          $tokens = $null; $errors = $null
+          $path = (Resolve-Path scripts/coba.ps1).Path
+          [void] [System.Management.Automation.Language.Parser]::ParseFile($path, [ref] $tokens, [ref] $errors)
+          foreach ($e in $errors) { Write-Host "::error file=scripts/coba.ps1,line=$($e.Extent.StartLineNumber)::$($e.Message)" }
+          if ($errors.Count -ne 0) { exit 1 }
+          Write-Host "coba.ps1 lolos parser PowerShell $($PSVersionTable.PSVersion)"
