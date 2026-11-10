@@ -1,0 +1,92 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "default",
+            "displayName": "Bawaan (Release)",
+            "description": "Build teroptimasi untuk dipakai sehari-hari, hasilnya di build/default.",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "dev",
+            "displayName": "Pengembangan (Debug, peringatan = galat)",
+            "description": "Build untuk mengubah kode: simbol debug lengkap dan setiap peringatan compiler menggagalkan build.",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ESTIMA_WARNINGS_AS_ERRORS": "ON"
+            }
+        },
+        {
+            "name": "std98",
+            "displayName": "C++98 (Release, peringatan = galat)",
+            "description": "Membuktikan sumber tetap bisa dikompilasi compiler lama yang hanya mengenal C++98, misalnya bawaan Dev-C++.",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ESTIMA_CXX_STANDARD": "98",
+                "ESTIMA_WARNINGS_AS_ERRORS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "configuration": "Release"
+        },
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "std98",
+            "configurePreset": "std98",
+            "configuration": "Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error"
+            }
+        },
+        {
+            "name": "default",
+            "inherits": "base",
+            "configurePreset": "default",
+            "configuration": "Release"
+        },
+        {
+            "name": "dev",
+            "inherits": "base",
+            "configurePreset": "dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "std98",
+            "inherits": "base",
+            "configurePreset": "std98",
+            "configuration": "Release"
+        }
+    ]
+}

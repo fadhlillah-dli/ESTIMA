@@ -1,0 +1,76 @@
+{
+    "version": "2.0.0",
+    "options": {
+        "cwd": "${workspaceFolder}"
+    },
+    "tasks": [
+        {
+            "label": "Siapkan folder build",
+            "detail": "Membuat folder build/ bila belum ada; dijalankan otomatis sebelum Build (g++)",
+            "type": "process",
+            "command": "mkdir",
+            "args": ["-p", "build"],
+            "windows": {
+                "command": "cmd.exe",
+                "args": ["/d", "/c", "if", "not", "exist", "build", "mkdir", "build"]
+            },
+            "hide": true,
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent", "panel": "shared" }
+        },
+        {
+            "label": "Build (g++)",
+            "detail": "Kompilasi semua berkas di src/ menjadi build/estima (build/estima.exe di Windows)",
+            "type": "process",
+            "command": "g++",
+            "args": [
+                "-std=c++17", "-Wall", "-Wextra", "-pedantic", "-Iinclude",
+                "src/app.cpp",
+                "src/calculation.cpp",
+                "src/component.cpp",
+                "src/input_parse.cpp",
+                "src/main.cpp",
+                "src/material_catalog.cpp",
+                "src/prompt.cpp",
+                "src/report.cpp",
+                "src/terminal.cpp",
+                "src/text_format.cpp",
+                "src/ui.cpp",
+                "-o", "build/estima"
+            ],
+            "dependsOn": "Siapkan folder build",
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": ["$gcc"],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "Build & Run",
+            "detail": "Kompilasi lalu jalankan program di terminal terintegrasi",
+            "type": "process",
+            "command": "${workspaceFolder}/build/estima",
+            "windows": {
+                "command": "${workspaceFolder}\\build\\estima.exe"
+            },
+            "dependsOn": "Build (g++)",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated", "focus": true }
+        },
+        {
+            "label": "Test (make)",
+            "detail": "make test: uji unit, lalu uji ujung-ke-ujung bila Python tersedia (di Windows lewat MSYS2 UCRT64 di C:\\msys64)",
+            "type": "process",
+            "command": "make",
+            "args": ["test"],
+            "windows": {
+                "command": "C:\\msys64\\usr\\bin\\bash.exe",
+                "args": ["-lc", "mingw32-make test"],
+                "options": {
+                    "env": { "MSYSTEM": "UCRT64", "CHERE_INVOKING": "1" }
+                }
+            },
+            "group": { "kind": "test", "isDefault": true },
+            "problemMatcher": ["$gcc"],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        }
+    ]
+}
