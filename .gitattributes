@@ -1,0 +1,13 @@
+# Semua berkas teks disimpan dan dikeluarkan (checkout) dengan akhir baris LF di sistem operasi
+# apa pun, supaya sumber, skrip, dan berkas pembanding uji sama persis di Windows, macOS, dan Linux.
+* text=auto eol=lf
+
+# Skrip shell selalu diperlakukan sebagai teks ber-LF: akhir baris CRLF membuat sh gagal membacanya.
+*.sh text eol=lf
+
+# Berkas biner pada dokumentasi: akhir barisnya tidak boleh diubah dan isinya tidak dibandingkan
+# sebagai teks.
+*.png binary
+*.gif binary
+*.pdf binary
+*.docx binary

@@ -1,0 +1,33 @@
+# Hasil build dan paket rilis (dibuat ulang dengan make, CMake, atau task VS Code)
+build/
+dist/
+*.o
+*.obj
+*.exe
+
+# Berkas CMake milik pengguna, dan sisa bila cmake tidak sengaja dijalankan di folder sumber
+CMakeUserPresets.json
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+
+# Laporan yang ditulis program lewat menu Simpan laporan
+laporan-estima.txt
+
+# Cache Python dari skrip uji dan skrip bantu
+__pycache__/
+*.py[cod]
+
+# Berkas sistem operasi dan editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vs/
+
+# Setelan VS Code milik pengguna; yang dibagikan hanya tasks.json dan c_cpp_properties.json
+.vscode/*
+!.vscode/tasks.json
+!.vscode/c_cpp_properties.json
