@@ -6,12 +6,12 @@
 // Nama  : Fadhlillah
 // NIM   : 2531070011
 // Dosen : Ali Muhammad, S.Kom., M.Kom.
-// Versi : 1.0.0
+// Versi : 1.0.1
 //
 // Tentang berkas ini
 //   Berkas tunggal ini adalah gabungan seluruh modul program, yaitu isi folder include/ dan src/
-//   pada repositori https://github.com/fadhlillah-dli/UTS_2531070011. Penggabungannya dikerjakan
-//   oleh scripts/amalgamate.py supaya program bisa dikompilasi dengan satu perintah dan dikumpulkan
+//   pada repositori https://github.com/fadhlillah-dli/ESTIMA. Penggabungannya dikerjakan oleh
+//   scripts/amalgamate.py supaya program bisa dikompilasi dengan satu perintah dan dikumpulkan
 //   sebagai satu berkas. Bila ada yang perlu diubah, perubahannya dikerjakan di modul asalnya, lalu
 //   berkas ini disusun ulang.
 //
@@ -152,15 +152,15 @@
 // meng-#include-nya, sehingga header ini aman dipakai oleh beberapa berkas .cpp sekaligus tanpa galat
 // "didefinisikan ganda" saat penautan (linking).
 const char* const APP_NAME = "ESTIMA"; // APP_NAME = "ESTIMA" adalah nama program; dipakai di judul banner, keluaran --version, bantuan, dan laporan berkas.
-const char* const APP_VERSION = "1.0.0"; // APP_VERSION = "1.0.0" adalah nomor versi program, satu-satunya sumber nomor versi;
-// opsi -v/--version mencetaknya sebagai "ESTIMA 1.0.0".
+const char* const APP_VERSION = "1.0.1"; // APP_VERSION = "1.0.1" adalah nomor versi program, satu-satunya sumber nomor versi;
+// opsi -v/--version mencetaknya sebagai "ESTIMA 1.0.1".
 const char* const APP_TAGLINE = "Estimasi Material dan Biaya Produksi Komponen Mesin"; // APP_TAGLINE adalah keterangan singkat program;
 // tampil sebagai baris pertama di dalam kotak banner, di baris pertama bantuan --help (sesudah nama dan versi), dan di kepala laporan berkas.
 const char* const APP_COURSE = "UTS Algoritma dan Pemrograman - Kelas 26FA"; // APP_COURSE adalah nama ujian dan kelas; ditampilkan di banner pembuka.
 const char* const APP_AUTHOR = "Fadhlillah (2531070011)"; // APP_AUTHOR adalah nama pembuat beserta NIM; ditampilkan di banner pembuka.
 const char* const APP_INSTITUTION = "Teknik Informatika - Universitas Sains Indonesia"; // APP_INSTITUTION adalah program studi dan kampus;
 // ditampilkan di banner pembuka.
-const char* const APP_REPOSITORY = "https://github.com/fadhlillah-dli/UTS_2531070011"; // APP_REPOSITORY adalah alamat repositori kode sumber;
+const char* const APP_REPOSITORY = "https://github.com/fadhlillah-dli/ESTIMA"; // APP_REPOSITORY adalah alamat repositori kode sumber;
 // dicetak di baris "Dokumentasi:" pada bantuan --help.
 
 // ===============================================================================================================
@@ -2834,7 +2834,7 @@ static const char* const DEFAULT_REPORT_FILE = "laporan-estima.txt"; // DEFAULT_
 // (opsi salah) tanpa ditulis dua kali.
 static void printUsage(std::ostream& out) { // printUsage() berfungsi untuk menulis cara pemakaian program ke aliran keluaran out.
     // Perintah out << ... di bawah adalah SATU perintah yang dipecah ke beberapa baris supaya mudah dibaca; perintah itu baru berakhir di titik koma.
-    out << APP_NAME << ' ' << APP_VERSION << " - " << APP_TAGLINE << "\n\n" // baris judul "ESTIMA 1.0.0 - Estimasi ..."; \n adalah karakter pindah baris,
+    out << APP_NAME << ' ' << APP_VERSION << " - " << APP_TAGLINE << "\n\n" // baris judul "ESTIMA <versi> - Estimasi ..."; \n adalah karakter pindah baris,
         // jadi "\n\n" mengakhiri baris judul lalu menyisakan satu baris kosong.
         << "Pemakaian: estima [opsi]\n\n" // cara memanggil program; [opsi] berarti opsi boleh ditulis, boleh juga tidak.
         << "Opsi:\n" // judul daftar opsi.
@@ -2856,7 +2856,7 @@ static void printBanner() { // printBanner() berfungsi untuk menggambar kotak id
     lines.push_back(StyledLine(APP_INSTITUTION, STYLE_NORMAL)); // baris 4: program studi dan universitas.
     // Tanda + pada std::string berarti menyambung teks. std::string(APP_NAME) mengubah teks tetap const char* menjadi std::string lebih dulu,
     // karena dua const char* tidak bisa disambung dengan +; begitu sisi kirinya std::string, sambungan berikutnya ikut menjadi std::string.
-    drawBox(std::cout, screenStyle(), std::string(APP_NAME) + " " + APP_VERSION, lines); // drawBox() menggambar kotak ke layar dengan judul "ESTIMA 1.0.0".
+    drawBox(std::cout, screenStyle(), std::string(APP_NAME) + " " + APP_VERSION, lines); // drawBox() menggambar kotak ke layar dengan judul "ESTIMA <versi>".
 } // akhir fungsi printBanner()
 
 // Menggambar menu utama di dalam kotak, lalu baris keadaan data dan petunjuk singkat di bawahnya.
@@ -3278,7 +3278,7 @@ int runApp(int argc, char* argv[]) { // argc adalah banyaknya kata pada baris pe
             printUsage(std::cout); // ... cetak bantuan ke keluaran biasa ...
             return EXIT_CODE_OK; // ... lalu selesai dengan kode 0 tanpa membuka menu.
         } else if (option == "-v" || option == "--version") { // else if hanya diperiksa bila syarat sebelumnya salah; ini opsi versi ...
-            std::cout << APP_NAME << ' ' << APP_VERSION << '\n'; // ... cetak "ESTIMA 1.0.0" ...
+            std::cout << APP_NAME << ' ' << APP_VERSION << '\n'; // ... cetak nama dan versi, misalnya "ESTIMA 1.0.1" ...
             return EXIT_CODE_OK; // ... lalu selesai dengan kode 0.
         } else if (option == "--no-color") { // opsi tanpa warna ...
             disableColor = true; // ... dicatat dulu; baru dipakai initTerminal() di bawah, sesudah semua opsi terbaca.

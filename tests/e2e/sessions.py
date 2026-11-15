@@ -40,7 +40,7 @@ COST_LIMIT = ("Total biaya komponen ini melebihi Rp999.999.999.999, batas yang b
               "program. Periksa lagi jumlah, berat, dan harganya.")
 LIST_FULL = ("Daftar sudah penuh (100 komponen). Hapus dulu komponen yang tidak dipakai lewat "
              "menu 5.")
-REPOSITORY_LINE = "Dokumentasi: https://github.com/fadhlillah-dli/UTS_2531070011"
+REPOSITORY_LINE = "Dokumentasi: https://github.com/fadhlillah-dli/ESTIMA"
 
 # Label pertanyaan yang dijawab sesi-sesi di bawah. Gate tata letak memakainya untuk mengenali
 # baris pertanyaan: di baris itu jawaban ikut tercetak, padahal yang harus muat di layar hanya

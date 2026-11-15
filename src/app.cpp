@@ -80,7 +80,7 @@ static const char* const DEFAULT_REPORT_FILE = "laporan-estima.txt"; // DEFAULT_
 // (opsi salah) tanpa ditulis dua kali.
 static void printUsage(std::ostream& out) { // printUsage() berfungsi untuk menulis cara pemakaian program ke aliran keluaran out.
     // Perintah out << ... di bawah adalah SATU perintah yang dipecah ke beberapa baris supaya mudah dibaca; perintah itu baru berakhir di titik koma.
-    out << APP_NAME << ' ' << APP_VERSION << " - " << APP_TAGLINE << "\n\n" // baris judul "ESTIMA 1.0.0 - Estimasi ..."; \n adalah karakter pindah baris,
+    out << APP_NAME << ' ' << APP_VERSION << " - " << APP_TAGLINE << "\n\n" // baris judul "ESTIMA <versi> - Estimasi ..."; \n adalah karakter pindah baris,
         // jadi "\n\n" mengakhiri baris judul lalu menyisakan satu baris kosong.
         << "Pemakaian: estima [opsi]\n\n" // cara memanggil program; [opsi] berarti opsi boleh ditulis, boleh juga tidak.
         << "Opsi:\n" // judul daftar opsi.
@@ -102,7 +102,7 @@ static void printBanner() { // printBanner() berfungsi untuk menggambar kotak id
     lines.push_back(StyledLine(APP_INSTITUTION, STYLE_NORMAL)); // baris 4: program studi dan universitas.
     // Tanda + pada std::string berarti menyambung teks. std::string(APP_NAME) mengubah teks tetap const char* menjadi std::string lebih dulu,
     // karena dua const char* tidak bisa disambung dengan +; begitu sisi kirinya std::string, sambungan berikutnya ikut menjadi std::string.
-    drawBox(std::cout, screenStyle(), std::string(APP_NAME) + " " + APP_VERSION, lines); // drawBox() menggambar kotak ke layar dengan judul "ESTIMA 1.0.0".
+    drawBox(std::cout, screenStyle(), std::string(APP_NAME) + " " + APP_VERSION, lines); // drawBox() menggambar kotak ke layar dengan judul "ESTIMA <versi>".
 } // akhir fungsi printBanner()
 
 // Menggambar menu utama di dalam kotak, lalu baris keadaan data dan petunjuk singkat di bawahnya.
@@ -524,7 +524,7 @@ int runApp(int argc, char* argv[]) { // argc adalah banyaknya kata pada baris pe
             printUsage(std::cout); // ... cetak bantuan ke keluaran biasa ...
             return EXIT_CODE_OK; // ... lalu selesai dengan kode 0 tanpa membuka menu.
         } else if (option == "-v" || option == "--version") { // else if hanya diperiksa bila syarat sebelumnya salah; ini opsi versi ...
-            std::cout << APP_NAME << ' ' << APP_VERSION << '\n'; // ... cetak "ESTIMA 1.0.0" ...
+            std::cout << APP_NAME << ' ' << APP_VERSION << '\n'; // ... cetak nama dan versi, misalnya "ESTIMA 1.0.1" ...
             return EXIT_CODE_OK; // ... lalu selesai dengan kode 0.
         } else if (option == "--no-color") { // opsi tanpa warna ...
             disableColor = true; // ... dicatat dulu; baru dipakai initTerminal() di bawah, sesudah semua opsi terbaca.

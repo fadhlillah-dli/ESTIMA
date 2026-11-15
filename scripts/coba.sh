@@ -1,6 +1,6 @@
 #!/bin/sh
 # Mencoba ESTIMA sekali jalan tanpa memasang apa pun (macOS, Linux, dan Android lewat Termux):
-#   curl -fsSL https://raw.githubusercontent.com/fadhlillah-dli/UTS_2531070011/main/scripts/coba.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/fadhlillah-dli/ESTIMA/main/scripts/coba.sh | sh
 #
 # Skrip ini mengunduh paket rilis terbaru ke folder sementara, mencocokkan SHA-256-nya dengan daftar SHA256SUMS
 # milik rilis itu, menjalankan programnya, lalu menghapus folder tersebut begitu program ditutup (juga bila
@@ -12,7 +12,7 @@
 set -eu
 
 main() {
-  REPO="fadhlillah-dli/UTS_2531070011"
+  REPO="fadhlillah-dli/ESTIMA"
   # Dua alamat berikut bisa diganti lewat variabel lingkungan supaya skrip ini bisa diuji terhadap rilis tiruan
   # yang dilayani dari komputer sendiri. Tidak ada pemeriksaan yang dilewati karenanya: dari alamat mana pun,
   # paket hanya dijalankan bila SHA-256-nya cocok dengan SHA256SUMS dari rilis yang sama.

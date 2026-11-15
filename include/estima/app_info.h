@@ -22,15 +22,15 @@
 // meng-#include-nya, sehingga header ini aman dipakai oleh beberapa berkas .cpp sekaligus tanpa galat
 // "didefinisikan ganda" saat penautan (linking).
 const char* const APP_NAME = "ESTIMA"; // APP_NAME = "ESTIMA" adalah nama program; dipakai di judul banner, keluaran --version, bantuan, dan laporan berkas.
-const char* const APP_VERSION = "1.0.0"; // APP_VERSION = "1.0.0" adalah nomor versi program, satu-satunya sumber nomor versi;
-// opsi -v/--version mencetaknya sebagai "ESTIMA 1.0.0".
+const char* const APP_VERSION = "1.0.1"; // APP_VERSION = "1.0.1" adalah nomor versi program, satu-satunya sumber nomor versi;
+// opsi -v/--version mencetaknya sebagai "ESTIMA 1.0.1".
 const char* const APP_TAGLINE = "Estimasi Material dan Biaya Produksi Komponen Mesin"; // APP_TAGLINE adalah keterangan singkat program;
 // tampil sebagai baris pertama di dalam kotak banner, di baris pertama bantuan --help (sesudah nama dan versi), dan di kepala laporan berkas.
 const char* const APP_COURSE = "UTS Algoritma dan Pemrograman - Kelas 26FA"; // APP_COURSE adalah nama ujian dan kelas; ditampilkan di banner pembuka.
 const char* const APP_AUTHOR = "Fadhlillah (2531070011)"; // APP_AUTHOR adalah nama pembuat beserta NIM; ditampilkan di banner pembuka.
 const char* const APP_INSTITUTION = "Teknik Informatika - Universitas Sains Indonesia"; // APP_INSTITUTION adalah program studi dan kampus;
 // ditampilkan di banner pembuka.
-const char* const APP_REPOSITORY = "https://github.com/fadhlillah-dli/UTS_2531070011"; // APP_REPOSITORY adalah alamat repositori kode sumber;
+const char* const APP_REPOSITORY = "https://github.com/fadhlillah-dli/ESTIMA"; // APP_REPOSITORY adalah alamat repositori kode sumber;
 // dicetak di baris "Dokumentasi:" pada bantuan --help.
 
 #endif // ESTIMA_APP_INFO_H - akhir penjaga header ESTIMA_APP_INFO_H

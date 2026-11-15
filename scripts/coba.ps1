@@ -1,5 +1,5 @@
 # Mencoba ESTIMA sekali jalan tanpa memasang apa pun (Windows PowerShell 5.1 atau PowerShell 7):
-#   irm https://raw.githubusercontent.com/fadhlillah-dli/UTS_2531070011/main/scripts/coba.ps1 | iex
+#   irm https://raw.githubusercontent.com/fadhlillah-dli/ESTIMA/main/scripts/coba.ps1 | iex
 #
 # Skrip ini mengunduh paket rilis Windows terbaru ke folder sementara, mencocokkan SHA-256-nya dengan daftar
 # SHA256SUMS milik rilis itu, menjalankan programnya, lalu menghapus folder tersebut begitu program ditutup (juga
@@ -17,7 +17,7 @@
     # Ctrl+C) berubah menjadi error. Nilainya hanya berlaku di dalam blok ini.
     $PSNativeCommandUseErrorActionPreference = $false
 
-    $repo = 'fadhlillah-dli/UTS_2531070011'
+    $repo = 'fadhlillah-dli/ESTIMA'
     # Dua alamat berikut bisa diganti lewat variabel lingkungan supaya skrip ini bisa diuji terhadap rilis tiruan
     # yang dilayani dari komputer sendiri. Tidak ada pemeriksaan yang dilewati karenanya: dari alamat mana pun,
     # paket hanya dijalankan bila SHA-256-nya cocok dengan SHA256SUMS dari rilis yang sama.

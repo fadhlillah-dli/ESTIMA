@@ -5,6 +5,13 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan n
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-16
+
+### Diubah
+- Repositori berganti nama menjadi `fadhlillah-dli/ESTIMA`. Alamat yang tercetak di bantuan program (`--help`) dan di
+  kepala berkas tunggal, alamat yang dipakai `scripts/coba.sh` dan `scripts/coba.ps1`, serta tautan di README dan
+  dokumen lain disesuaikan dengan nama baru itu. Perhitungan dan tampilan program tidak berubah.
+
 ## [1.0.0] - 2026-11-11
 
 ### Ditambahkan
@@ -33,5 +40,6 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan n
   rilis terbaru tanpa memasang (`coba.sh` menolak macOS yang lebih lama dari 11 dengan pesan yang jelas).
 - Dokumen rancangan: pseudocode (`docs/pseudocode.md`) dan flowchart (`docs/flowchart.md`).
 
-[Unreleased]: https://github.com/fadhlillah-dli/UTS_2531070011/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/fadhlillah-dli/UTS_2531070011/releases/tag/v1.0.0
+[Unreleased]: https://github.com/fadhlillah-dli/ESTIMA/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/fadhlillah-dli/ESTIMA/releases/tag/v1.0.1
+[1.0.0]: https://github.com/fadhlillah-dli/ESTIMA/releases/tag/v1.0.0

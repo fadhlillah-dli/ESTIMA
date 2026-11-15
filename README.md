@@ -72,13 +72,13 @@ macOS 11 (Big Sur) atau lebih baru, Linux (x86_64 atau aarch64/ARM64, misalnya R
 dan Android lewat Termux (aarch64; `pkg install curl` bila belum ada), di Terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fadhlillah-dli/UTS_2531070011/main/scripts/coba.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fadhlillah-dli/ESTIMA/main/scripts/coba.sh | sh
 ```
 
 Windows 10/11 (x64), di **PowerShell** (tekan tombol Windows, ketik `PowerShell`, Enter; bukan Command Prompt):
 
 ```powershell
-irm https://raw.githubusercontent.com/fadhlillah-dli/UTS_2531070011/main/scripts/coba.ps1 | iex
+irm https://raw.githubusercontent.com/fadhlillah-dli/ESTIMA/main/scripts/coba.ps1 | iex
 ```
 
 Paket diunduh ulang setiap kali perintah dijalankan (sekitar 1 MB), jadi perlu koneksi internet. Paket macOS
@@ -108,8 +108,8 @@ Di Dev-C++, buka berkas itu lalu pilih *Execute > Compile & Run* (F11); di Code:
 **Modular.** Kode yang sama, dipisah per modul di `include/` dan `src/`:
 
 ```bash
-git clone https://github.com/fadhlillah-dli/UTS_2531070011.git
-cd UTS_2531070011
+git clone https://github.com/fadhlillah-dli/ESTIMA.git
+cd ESTIMA
 g++ -std=c++17 -Wall -Wextra -pedantic -Iinclude src/*.cpp -o estima && ./estima
 ```
 
@@ -195,7 +195,7 @@ Data satu komponen disimpan dalam `struct Component`; daftarnya adalah array ber
 ## Struktur proyek
 
 ```text
-UTS_2531070011/
+ESTIMA/
 ├── include/estima/          deklarasi tiap modul (.h)
 ├── src/                     isi tiap modul (.cpp) dan main.cpp
 ├── amalgamation/            UTS_2531070011.cpp: seluruh program dalam satu berkas
