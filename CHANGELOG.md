@@ -6,8 +6,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan n
 ## [Unreleased]
 
 ### Diubah
-- Rekaman demo di README (`docs/img/demo.gif`) direkam ulang dengan ESTIMA 1.0.1, sehingga nomor versi di judul menu
-  pada rekaman sama dengan rilis terbaru. Alur sesinya sama seperti rekaman sebelumnya.
+- Rekaman demo di README (`docs/img/demo.gif`) direkam ulang dengan ESTIMA 1.0.1, sehingga nomor versi di judul
+  banner pembuka pada rekaman sama dengan rilis terbaru. Alur sesinya sama seperti rekaman sebelumnya.
 
 ## [1.0.1] - 2026-11-16
 
