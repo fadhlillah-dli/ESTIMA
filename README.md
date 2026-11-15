@@ -12,10 +12,10 @@ Untuk setiap komponen pengguna mengisi nama, jumlah, berat per unit (kg), dan ha
 menghitung total berat dan total biaya tiap komponen, total keseluruhan, dan menunjukkan komponen dengan biaya
 produksi tertinggi, dalam menu interaktif dengan pemeriksaan masukan yang ketat dan tampilan tabel berwarna.
 
-*ESTIMA is a C++ console program that estimates material needs and production cost for machine components
-(a mid-term exam answer for an introductory programming course). It ships as a modular code base plus a
-single-file edition, compiles cleanly from C++98 to C++23 on GCC, Clang, MinGW-w64 and MSVC, and has prebuilt
-packages for Windows 10/11, macOS 11 or later, Linux and Android (Termux). The user interface is in Indonesian.*
+*ESTIMA is a C++ console program that estimates material needs and production cost for machine components. It
+ships as a modular code base plus a single-file edition, compiles cleanly from C++98 to C++23 on GCC, Clang,
+MinGW-w64 and MSVC, and has prebuilt packages for Windows 10/11, macOS 11 or later, Linux and Android (Termux).
+The user interface is in Indonesian.*
 
 ## Demo
 
