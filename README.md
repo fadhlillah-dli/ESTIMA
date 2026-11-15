@@ -6,8 +6,7 @@
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
 **ESTIMA** (Estimasi Material) adalah program konsol C++ untuk menghitung kebutuhan material dan memperkirakan
-biaya produksi komponen mesin. Program ini adalah jawaban Ujian Tengah Semester mata kuliah **Algoritma dan
-Pemrograman** (Teknik Informatika, Universitas Sains Indonesia, kelas 26FA, semester ganjil 2026/2027).
+biaya produksi komponen mesin.
 
 Untuk setiap komponen pengguna mengisi nama, jumlah, berat per unit (kg), dan harga material per kg. Program
 menghitung total berat dan total biaya tiap komponen, total keseluruhan, dan menunjukkan komponen dengan biaya
