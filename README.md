@@ -84,8 +84,8 @@ irm https://raw.githubusercontent.com/fadhlillah-dli/ESTIMA/main/scripts/coba.ps
 Paket diunduh ulang setiap kali perintah dijalankan (sekitar 1 MB), jadi perlu koneksi internet. Paket macOS
 jalan di Mac Apple Silicon maupun Intel. Di macOS yang lebih lama dari 11, `coba.sh` berhenti dan menjelaskan
 alasannya; di sana program tetap bisa dikompilasi sendiri seperti di bawah. Di Windows, bila jendela PowerShell
-ditutup selagi program masih berjalan, folder sementaranya tertinggal di `%TEMP%` dan dibersihkan sendiri saat
-perintah itu dijalankan lagi.
+ditutup selagi program masih berjalan, folder sementaranya tertinggal di `%TEMP%`; sisa yang sudah berumur lebih dari
+sehari dibersihkan sendiri saat perintah itu dijalankan lagi.
 
 ## Kompilasi sendiri
 
