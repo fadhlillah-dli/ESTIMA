@@ -3,8 +3,9 @@
 #
 # Skrip ini mengunduh paket rilis Windows terbaru ke folder sementara, mencocokkan SHA-256-nya dengan daftar
 # SHA256SUMS milik rilis itu, menjalankan programnya, lalu menghapus folder tersebut begitu program ditutup (juga
-# bila dihentikan dengan Ctrl+C). Tidak ada yang dipasang, PATH dan registri tidak diubah, dan hak Administrator
-# tidak diperlukan. Kode keluar program diteruskan lewat $LASTEXITCODE; kegagalan skrip memberi nilai 1.
+# bila dihentikan dengan Ctrl+C). Bila jendela PowerShell ditutup selagi program berjalan, foldernya tertinggal dan
+# baru dihapus pada pemakaian berikutnya. Tidak ada yang dipasang, PATH dan registri tidak diubah, dan hak
+# Administrator tidak diperlukan. Kode keluar program diteruskan lewat $LASTEXITCODE; kegagalan skrip memberi nilai 1.
 #
 # Seluruh isi dibungkus & { ... } supaya berjalan di lingkupnya sendiri: `iex` menjalankan teks ini di sesi milik
 # pengguna, dan variabel maupun $ErrorActionPreference dari skrip ini tidak boleh tertinggal di sana. Berkas ini
@@ -121,6 +122,15 @@
         if ($version -notmatch '^[A-Za-z0-9._-]+$') { throw "nama versi rilis tidak dikenali: $version" }
         $asset = "estima-$version-windows-x86_64.zip"
         $base = "$web/releases/download/$version"
+
+        # Sisa percobaan lama ikut dibersihkan. Bila jendela PowerShell ditutup selagi program masih berjalan, blok
+        # finally di bawah tidak sempat bekerja dan folder sementaranya tertinggal. Yang dihapus hanya folder buatan
+        # skrip ini (estima-coba-*) yang sudah berumur lebih dari sehari, supaya percobaan lain yang sedang berjalan
+        # tidak terganggu; folder yang masih dipakai atau tidak bisa dihapus dilewati tanpa pesan.
+        $staleBefore = (Get-Date).AddDays(-1)
+        Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'estima-coba-*' -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -lt $staleBefore } |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
         # Folder dibuat di dalam try supaya finally di bawah tetap menghapusnya, termasuk bila Ctrl+C ditekan tepat
         # sesudah folder dibuat.

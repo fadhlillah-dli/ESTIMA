@@ -12,6 +12,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/), dan n
   kepala berkas tunggal, alamat yang dipakai `scripts/coba.sh` dan `scripts/coba.ps1`, serta tautan di README dan
   dokumen lain disesuaikan dengan nama baru itu. Perhitungan dan tampilan program tidak berubah.
 
+### Diperbaiki
+- `scripts/coba.ps1`: folder sementara yang tertinggal karena jendela PowerShell ditutup selagi program masih berjalan
+  kini dibersihkan pada pemakaian berikutnya. Yang dihapus hanya folder `estima-coba-*` yang berumur lebih dari sehari.
+
 ## [1.0.0] - 2026-11-11
 
 ### Ditambahkan
